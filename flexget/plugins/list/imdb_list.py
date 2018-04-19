@@ -7,6 +7,7 @@ import logging
 import re
 from collections import MutableSet
 from datetime import datetime
+from itertools import chain
 
 from requests.exceptions import RequestException
 from requests.utils import cookiejar_from_dict
@@ -63,16 +64,16 @@ class IMDBListList(Base):
 
 
 if PY3:
-    csv_reader = csv.reader
+    csv_dictreader = csv.DictReader
 else:
-    def csv_reader(iterable, dialect='excel', *args, **kwargs):
+    def csv_dictreader(iterable, dialect='excel', *args, **kwargs):
         """
         Compatibilty function to make python 2 act like python 3
         Always takes and returns text (no bytes).
         """
         iterable = (l.encode('utf-8') for l in iterable)
-        for row in csv.reader(iterable):
-            yield [cell.decode('utf-8') for cell in row]
+        for row in csv.DictReader(iterable):
+            yield {header.decode('utf-8'): value.decode('utf-8') for header, value in row.items()}
 
 
 class ImdbEntrySet(MutableSet):
@@ -96,6 +97,7 @@ class ImdbEntrySet(MutableSet):
         self.user_id = None
         self.list_id = None
         self.cookies = None
+        self.hidden_value = None
         self._items = None
         self._authenticated = False
 
@@ -105,17 +107,24 @@ class ImdbEntrySet(MutableSet):
             self.authenticate()
         return self._session
 
-    def get_user_id(self, cookies=None):
+    def get_user_id_and_hidden_value(self, cookies=None):
         try:
             if cookies:
                 self._session.cookies = cookiejar_from_dict(cookies)
             # We need to allow for redirects here as it performs 1-2 redirects before reaching the real profile url
-            response = self._session.head('https://www.imdb.com/profile', allow_redirects=True)
+            response = self._session.get('https://www.imdb.com/profile', allow_redirects=True)
         except RequestException as e:
             raise PluginError(str(e))
 
-        match = re.search('ur\d+(?!\d)', response.url)
-        return match.group() if match else None
+        user_id_match = re.search('ur\d+(?!\d)', response.url)
+        # extract the hidden form value that we need to do post requests later on
+        try:
+            soup = get_soup(response.text)
+            self.hidden_value = soup.find('input', attrs={'id': '49e6c'})['value']
+        except Exception as e:
+            log.warning('Unable to locate the hidden form value ''49e6c''. Without it, you might not be able to '
+                        'add or remove items. %s', e)
+        return user_id_match.group() if user_id_match else None
 
     def authenticate(self):
         """Authenticates a session with IMDB, and grabs any IDs needed for getting/modifying list."""
@@ -125,7 +134,7 @@ class ImdbEntrySet(MutableSet):
             if user and user.cookies and user.user_id:
                 log.debug('login credentials found in cache, testing')
                 self.user_id = user.user_id
-                if not self.get_user_id(cookies=user.cookies):
+                if not self.get_user_id_and_hidden_value(cookies=user.cookies):
                     log.debug('cache credentials expired')
                 else:
                     self.cookies = user.cookies
@@ -157,7 +166,7 @@ class ImdbEntrySet(MutableSet):
                 self._session.post(action, data=data)
                 self._session.headers.update({'Referer': 'http://www.imdb.com/'})
 
-                self.user_id = self.get_user_id()
+                self.user_id = self.get_user_id_and_hidden_value()
                 if not self.user_id:
                     raise plugin.PluginError('Login to IMDB failed. Check your credentials.')
                 self.cookies = self._session.cookies.get_dict(domain='.imdb.com')
@@ -212,32 +221,40 @@ class ImdbEntrySet(MutableSet):
             except RequestException as e:
                 raise PluginError(e.args[0])
             lines = r.iter_lines(decode_unicode=True)
-            # Throw away first line with headers
-            next(lines)
+            # Normalize headers to lowercase
+            headers = next(lines).lower()
+            # Chain them back together
+            lines = chain([headers], lines)
             self._items = []
-            for row in csv_reader(lines):
-                log.debug('parsing line from csv: %s', ', '.join(row))
-                if not len(row) == 15:
-                    log.debug('no movie row detected, skipping. %s', ', '.join(row))
+            for row in csv_dictreader(lines):
+                log.debug('parsing line from csv: %s', row)
+
+                try:
+                    item_type = row['title type'].lower()
+                    name = row['title']
+                    year = int(row['year']) if row['year'] != '????' else None
+                    created = datetime.strptime(row['created'], '%Y-%m-%d') if row.get('created') else None
+                    modified = datetime.strptime(row['modified'], '%Y-%m-%d') if row.get('modified') else None
+                    entry = Entry({
+                        'title': '%s (%s)' % (name, year) if year != '????' else name,
+                        'url': row['url'],
+                        'imdb_id': row['const'],
+                        'imdb_url': row['url'],
+                        'imdb_list_position': int(row['position']) if 'position' in row else None,
+                        'imdb_list_created': created,
+                        'imdb_list_modified': modified,
+                        'imdb_list_description': row.get('description'),
+                        'imdb_name': name,
+                        'imdb_year': year,
+                        'imdb_user_score': float(row['imdb rating']) if row['imdb rating'] else None,
+                        'imdb_votes': int(row['num votes']) if row['num votes'] else None,
+                        'imdb_genres': [genre.strip() for genre in row['genres'].split(',')]
+                    })
+
+                except ValueError as e:
+                    log.debug('no movie row detected, skipping. %s. Exception: %s', row, e)
                     continue
-                entry = Entry({
-                    'title': '%s (%s)' % (row[5], row[10]) if row[10] != '????' else '%s' % row[5],
-                    'url': row[6],
-                    'imdb_id': row[1],
-                    'imdb_url': row[6],
-                    'imdb_list_position': int(row[0]),
-                    'imdb_list_created': datetime.strptime(row[2], '%Y-%m-%d') if row[2] else None,
-                    'imdb_list_modified': datetime.strptime(row[3], '%Y-%m-%d') if row[3] else None,
-                    'imdb_list_description': row[4],
-                    'imdb_name': row[5],
-                    'imdb_year': int(row[10]) if row[10] != '????' else None,
-                    'imdb_user_score': float(row[8]) if row[8] else None,
-                    'imdb_votes': int(row[12]) if row[12] else None,
-                    'imdb_genres': [genre.strip() for genre in row[11].split(',')]
-                })
-                item_type = row[7].lower()
-                name = row[5]
-                year = int(row[10]) if row[10] != '????' else None
+
                 if item_type in MOVIE_TYPES:
                     entry['movie_name'] = name
                     entry['movie_year'] = year
@@ -275,12 +292,16 @@ class ImdbEntrySet(MutableSet):
             return
         # Get the list item id
         item_ids = None
+        urls = []
         if self.config['list'] == 'watchlist':
+            method = 'delete'
             data = {'consts[]': entry['imdb_id'], 'tracking_tag': 'watchlistRibbon'}
             status = self.session.post('http://www.imdb.com/list/_ajax/watchlist_has', data=data,
                                        cookies=self.cookies).json()
             item_ids = status.get('has', {}).get(entry['imdb_id'])
+            urls = ['http://www.imdb.com/watchlist/%s' % entry['imdb_id']]
         else:
+            method = 'post'
             data = {'tconst': entry['imdb_id']}
             status = self.session.post('http://www.imdb.com/list/_ajax/wlb_dropdown', data=data,
                                        cookies=self.cookies).json()
@@ -288,18 +309,16 @@ class ImdbEntrySet(MutableSet):
                 if a_list['data_list_id'] == self.list_id:
                     item_ids = a_list['data_list_item_ids']
                     break
+
+            for item_id in item_ids:
+                urls.append('http://www.imdb.com/list/%s/li%s/delete' % (self.list_id, item_id))
         if not item_ids:
             log.warning('%s is not in list %s, cannot be removed', entry['imdb_id'], self.list_id)
             return
-        data = {
-            'action': 'delete',
-            'list_id': self.list_id,
-            'ref_tag': 'title'
-        }
-        for item_id in item_ids:
+
+        for url in urls:
             log.debug('found movie %s with ID %s in list %s, removing', entry['title'], entry['imdb_id'], self.list_id)
-            self.session.post('http://www.imdb.com/list/_ajax/edit', data=dict(data, list_item_id=item_id),
-                              cookies=self.cookies)
+            self.session.request(method, url, data={'49e6c': self.hidden_value}, cookies=self.cookies)
             # We don't need to invalidate our cache if we remove the item
             self._items = [i for i in self._items if i['imdb_id'] != entry['imdb_id']] if self._items else None
 
@@ -310,15 +329,17 @@ class ImdbEntrySet(MutableSet):
         if 'imdb_id' not in entry:
             log.warning('Cannot add %s to imdb_list because it does not have an imdb_id', entry['title'])
             return
-        # Manually calling authenticate to fetch list_id and cookies
+        # Manually calling authenticate to fetch list_id and cookies and hidden form value
         self.authenticate()
-        data = {
-            'const': entry['imdb_id'],
-            'list_id': self.list_id,
-            'ref_tag': 'title'
-        }
+        if self.config['list'] == 'watchlist':
+            method = 'put'
+            url = 'http://www.imdb.com/watchlist/%s' % entry['imdb_id']
+        else:
+            method = 'post'
+            url = 'http://www.imdb.com/list/%s/%s/add' % (self.list_id, entry['imdb_id'])
+
         log.debug('adding title %s with ID %s to imdb %s', entry['title'], entry['imdb_id'], self.list_id)
-        self.session.post('http://www.imdb.com/list/_ajax/edit', data=data, cookies=self.cookies)
+        self.session.request(method, url, cookies=self.cookies, data={'49e6c': self.hidden_value})
 
     def add(self, entry):
         self._add(entry)
