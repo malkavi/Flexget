@@ -73,7 +73,11 @@ class UrlRewriteDescargas2020(object):
                 match = torrent_id_prog.search(torrent_ids[0])
                 if match:
                     torrent_id = match.group(2)
-                    return torrent_id.replace('descargar-torrent', 'download') + '.torrent'
+                    if 'tvsinpagar.com' in url:
+                        torrent_id = torrent_id.replace('tvsinpagar', 'www.tvsinpagar')
+                        return torrent_id.replace('descargar-torrent', 'torrent') + '.torrent'
+                    else:
+                        return torrent_id.replace('descargar-torrent', 'download') + '.torrent'
 
         if not torrent_id:
             raise UrlRewritingError('Unable to locate torrent ID from url %s' % url)
