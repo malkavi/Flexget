@@ -8,6 +8,7 @@ from builtins import *  # noqa  pylint: disable=unused-import, redefined-builtin
 import atexit  # noqa
 import codecs  # noqa
 import copy  # noqa
+import errno  # noqa
 import fnmatch  # noqa
 import logging  # noqa
 import os  # noqa
@@ -335,7 +336,7 @@ class Manager(object):
             console('There is a FlexGet process already running for this config, sending execution there.')
             log.debug('Sending command to running FlexGet process: %s' % self.args)
             try:
-                client = IPCClient(ipc_info['port'], ipc_info['password'])
+                client = IPCClient(ipc_info['port'], ipc_info['password'], sync_request_timeout=self.options.timeout)
             except ValueError as e:
                 log.error(e)
             else:
@@ -852,11 +853,14 @@ class Manager(object):
                     f.write('%s: %s\n' % (key, ipc_info[key]))
 
     def release_lock(self):
-        if os.path.exists(self.lockfile):
+        try:
             os.remove(self.lockfile)
-            log.debug('Removed %s' % self.lockfile)
-        else:
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
             log.debug('Lockfile %s not found' % self.lockfile)
+        else:
+            log.debug('Removed %s' % self.lockfile)
 
     def daemonize(self):
         """Daemonizes the current process. Returns the new pid"""

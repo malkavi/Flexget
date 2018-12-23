@@ -176,13 +176,14 @@ class NPOWatchlist(object):
             log.debug('Series info found at: %s', response.url)
             page = get_soup(response.content)
             series = page.find('section', class_='npo-header-episode-meta')
-            # create a stub to store the common values for all episodes of this series
-            series_info = {'npo_url': response.url,  # we were redirected to the true URL
-                           'npo_name': series.find('h1').text,
-                           'npo_description': series.find('div', id='metaContent').find('p').text,
-                           'npo_language': 'nl',  # hard-code the language as if in NL, for lookup plugins
-                           'npo_version': page.find('meta', attrs={'name': 'generator'})['content']}  # include NPO website version
-            log.debug('Parsed series info for: %s (%s)', series_info['npo_name'], mediaId)
+            if series:  # sometimes the NPO page does not return valid content
+                # create a stub to store the common values for all episodes of this series
+                series_info = {'npo_url': response.url,  # we were redirected to the true URL
+                               'npo_name': series.find('h1').text,
+                               'npo_description': series.find('div', id='metaContent').find('p').text,
+                               'npo_language': 'nl',  # hard-code the language as if in NL, for lookup plugins
+                               'npo_version': page.find('meta', attrs={'name': 'generator'})['content']}  # include NPO website version
+                log.debug('Parsed series info for: %s (%s)', series_info['npo_name'], mediaId)
         except RequestException as e:
             log.error('Request error: %s' % str(e))
         return series_info
@@ -195,7 +196,7 @@ class NPOWatchlist(object):
             for tile in tiles:
                 # there is only one list_item per tile
                 for list_item in get_soup(tile).findAll('div', class_='npo-asset-tile-container'):
-                    episode_id = list_item['id']
+                    episode_id = list_item['data-id']
                     log.debug('Parsing episode: %s', episode_id)
 
                     url = list_item.find('a')['href']
