@@ -51,7 +51,7 @@ class UrlRewriteDescargas2020(object):
         except requests.exceptions.RequestException as e:
             raise UrlRewritingError(e)
         try:
-            soup = get_soup(page.text)
+            soup = get_soup(page.content, "html.parser")
         except Exception as e:
             raise UrlRewritingError(e)
 
