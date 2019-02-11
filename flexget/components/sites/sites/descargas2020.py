@@ -112,7 +112,7 @@ class UrlRewriteDescargas2020(object):
                 log.error('Error searching Descargas2020: %s', e)
                 return results
             content = response.content
-            soup = get_soup(content.content, "html.parser")
+            soup = get_soup(content, "html.parser")
             soup2 = soup.find('ul', attrs={'class': 'buscar-list'})
             children = soup2.findAll('a', href=True)
             for child in children:
