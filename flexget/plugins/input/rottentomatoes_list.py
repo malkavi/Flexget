@@ -1,7 +1,7 @@
 from __future__ import unicode_literals, division, absolute_import
-from builtins import *  # noqa pylint: disable=unused-import, redefined-builtin
 
 import logging
+from builtins import *  # noqa pylint: disable=unused-import, redefined-builtin
 
 from flexget import plugin
 from flexget.entry import Entry
@@ -9,10 +9,12 @@ from flexget.event import event
 from flexget.utils.cached_input import cached
 
 try:
-    from flexget.plugins.internal.api_rottentomatoes import lists
+    # NOTE: Importing other plugins is discouraged!
+    from flexget.plugins.internal import api_rottentomatoes as plugin_api_rottentomatoes
 except ImportError:
-    raise plugin.DependencyError(issued_by='rottentomatoes_lookup', missing='api_rottentomatoes',
-                                 message='rottentomatoes_lookup requires the `api_rottentomatoes` plugin')
+    raise plugin.DependencyError(
+        issued_by=__name__, missing='api_rottentomatoes',
+    )
 
 log = logging.getLogger('rottentomatoes_list')
 
@@ -36,18 +38,21 @@ class RottenTomatoesList(object):
 
     """
 
-    def __init__(self):
-        # We could pull these from the API through lists.json but that's extra web/API key usage
-        self.dvd_lists = ['top_rentals', 'current_releases', 'new_releases', 'upcoming']
-        self.movie_lists = ['box_office', 'in_theaters', 'opening', 'upcoming']
-
-    def validator(self):
-        from flexget import validator
-        root = validator.factory('dict')
-        root.accept('list', key='dvds').accept('choice').accept_choices(self.dvd_lists)
-        root.accept('list', key='movies').accept('choice').accept_choices(self.movie_lists)
-        root.accept('text', key='api_key')
-        return root
+    schema = {
+        'type': 'object',
+        'properties': {
+            'dvds': {
+                'type': 'array',
+                'items': {'enum': ['top_rentals', 'current_releases', 'new_releases', 'upcoming']}
+            },
+            'movies': {
+                'type': 'array',
+                'items': {'enum': ['box_office', 'in_theaters', 'opening', 'upcoming']}
+            },
+            'api_key': {'type': 'string'}
+        },
+        'additionalProperties': False
+    }
 
     @cached('rottentomatoes_list', persist='2 hours')
     def on_task_input(self, task, config):
@@ -58,7 +63,7 @@ class RottenTomatoesList(object):
                 continue
 
             for l_name in l_names:
-                results = lists(list_type=l_type, list_name=l_name, api_key=api_key)
+                results = plugin_api_rottentomatoes.lists(list_type=l_type, list_name=l_name, api_key=api_key)
                 if results:
                     for movie in results['movies']:
                         if [entry for entry in entries if movie['title'] == entry.get('title')]:

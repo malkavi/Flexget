@@ -11,7 +11,6 @@ from flexget import options, plugin
 from flexget import db_schema
 from flexget.event import event
 from flexget.manager import Session
-from flexget.plugin import get_plugin_by_name, PluginError, PluginWarning
 from flexget.utils.tools import parse_timedelta, multiply_timedelta, aggregate_inputs
 
 log = logging.getLogger('discover')
@@ -105,7 +104,7 @@ class Discover(object):
                     plugin_name, plugin_config = list(item.items())[0]
                 else:
                     plugin_name, plugin_config = item, None
-                search = get_plugin_by_name(plugin_name).instance
+                search = plugin.get(plugin_name, self)
                 if not callable(getattr(search, 'search')):
                     log.critical('Search plugin %s does not implement search method', plugin_name)
                     continue
@@ -118,18 +117,18 @@ class Discover(object):
                         continue
                     log.debug('Discovered %s entries from %s', len(search_results), plugin_name)
                     if config.get('limit'):
-                        search_results = sorted(search_results, reverse=True,
-                                                key=lambda x: x.get('search_sort', ''))[:config['limit']]
+                        search_results = search_results[:config['limit']]
                     for e in search_results:
                         e['discovered_from'] = entry['title']
                         e['discovered_with'] = plugin_name
-                        e.on_complete(self.entry_complete, query=entry, search_results=search_results)
+                        # 'search_results' can be any iterable, make sure it's a list.
+                        e.on_complete(self.entry_complete, query=entry, search_results=list(search_results))
 
                     entry_results.extend(search_results)
 
-                except PluginWarning as e:
+                except plugin.PluginWarning as e:
                     log.verbose('No results from %s: %s', plugin_name, e)
-                except PluginError as e:
+                except plugin.PluginError as e:
                     log.error('Error searching with %s: %s', plugin_name, e)
             if not entry_results:
                 log.verbose('No search results for `%s`', entry['title'])
@@ -137,7 +136,7 @@ class Discover(object):
                 continue
             result.extend(entry_results)
 
-        return sorted(result, reverse=True, key=lambda x: x.get('search_sort', -1))
+        return result
 
     def entry_complete(self, entry, query=None, search_results=None, **kwargs):
         """Callback for Entry"""
@@ -155,7 +154,7 @@ class Discover(object):
         :param dict estimation_mode: mode -> loose, strict, ignore
         :return: Entries that we have estimated to be available
         """
-        estimator = get_plugin_by_name('estimate_release').instance
+        estimator = plugin.get('estimate_release', self)
         result = []
         for entry in entries:
             est_date = estimator.estimate(entry)

@@ -4,8 +4,8 @@ from builtins import *  # noqa pylint: disable=unused-import, redefined-builtin
 import pytest
 from jinja2 import Template
 
-from flexget.plugins.parsers.parser_guessit import ParserGuessit
-from flexget.plugins.parsers.parser_internal import ParserInternal
+from flexget.components.parsing.parsers.parser_guessit import ParserGuessit
+from flexget.components.parsing.parsers.parser_internal import ParserInternal
 from flexget.utils.qualities import Quality
 
 
@@ -161,6 +161,11 @@ class TestFilterQuality(object):
             quality: "<=cam <HR"
           min_max:
             quality: HR-720i
+          quality_str:
+            template: no_global
+            mock:
+              - {title: 'Test S01E01 HDTV 1080p', quality: 'hdtv 1080p dd+5.1'}
+            accept_all: yes
     """
 
     @pytest.fixture(scope='class', params=['internal', 'guessit'], ids=['internal', 'guessit'])
@@ -211,6 +216,12 @@ class TestFilterQuality(object):
         assert entry in task.accepted, 'HR should be accepted'
         assert len(task.rejected) == 3, 'wrong number of entries rejected'
         assert len(task.accepted) == 1, 'wrong number of entries accepted'
+
+    def test_quality_string(self, execute_task):
+        task = execute_task('quality_str')
+        entry = task.find_entry('accepted', title='Test S01E01 HDTV 1080p')
+        assert isinstance(entry['quality'], Quality), 'Wrong quality type, should be Quality not str'
+        assert str(entry['quality']) == '1080p hdtv dd+5.1'
 
 
 class TestQualityAudio(object):

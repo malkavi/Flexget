@@ -1,26 +1,22 @@
 from __future__ import unicode_literals, division, absolute_import
 from builtins import *  # noqa pylint: disable=unused-import, redefined-builtin
 
-from datetime import datetime, timedelta
 from io import StringIO
 
 import pytest
 from jinja2 import Template
-from sqlalchemy.sql import select
 
 from flexget.entry import Entry
 from flexget.logger import capture_output
-from flexget.manager import Session, get_parser
-from flexget.plugins.filter.series import Series, SeriesTask, Episode, EpisodeRelease, Season, SeasonRelease
+from flexget.manager import get_parser, Session
 from flexget.task import TaskAbort
+from flexget.components.series import db
 
 
 def age_series(**kwargs):
-    from flexget.plugins.filter.series import EpisodeRelease
-    from flexget.manager import Session
     import datetime
     session = Session()
-    session.query(EpisodeRelease).update({'first_seen': datetime.datetime.now() - datetime.timedelta(**kwargs)})
+    session.query(db.EpisodeRelease).update({'first_seen': datetime.datetime.now() - datetime.timedelta(**kwargs)})
     session.commit()
 
 
@@ -298,7 +294,9 @@ class TestFilterSeries(object):
                 - name 2
             - paren title (US):
                 alternate_name: paren title 2013
-
+          test_input_order_preserved:
+            series:
+            - Some Show
     """
 
     def test_smoke(self, execute_task):
@@ -368,6 +366,18 @@ class TestFilterSeries(object):
     def test_alternate_name(self, execute_task):
         task = execute_task('test_alternate_name')
         assert all(e.accepted for e in task.all_entries), 'All releases should have matched a show'
+
+    @pytest.mark.parametrize('reverse', [False, True])
+    def test_input_order_preserved(self, manager, execute_task, reverse):
+        """If multiple versions of an episode are acceptable, make sure the first one is accepted."""
+        entries = [
+            Entry(title='Some Show S01E01 720p proper', url='http://a'),
+            Entry(title='Some Show S01E01 1080p', url='http://b')
+        ]
+        if reverse:
+            entries.reverse()
+        task = execute_task('test_input_order_preserved', options={'inject': entries})
+        assert task.accepted[0] == entries[0], 'first entry should have been accepted'
 
 
 class TestEpisodeAdvancement(object):
@@ -866,7 +876,6 @@ class TestDuplicates(object):
               - {title: 'Foo.Bar.S02E04.DSRIP.XviD-2HD[ASDF]'}
               - {title: 'Foo.Bar.S02E04.HDTV.1080p.XviD-2HD[ASDF]'}
               - {title: 'Foo.Bar.S02E03.HDTV.XviD-FlexGet'}
-              - {title: 'Foo.Bar.S02E05.HDTV.XviD-ZZZ'}
               - {title: 'Foo.Bar.S02E05.720p.HDTV.XviD-YYY'}
             series:
               - foo bar
@@ -978,7 +987,6 @@ class TestQualities(object):
               - title: FooBum.S03E01.720p-ver2 # Duplicate ep
           target_1:
             mock:
-              - title: Food.S06E11.sdtv
               - title: Food.S06E11.hdtv
           target_2:
             mock:
@@ -1277,7 +1285,6 @@ class TestTimeframe(object):
                     - 720p
 
             mock:
-              - {title: 'Q Test.S01E02.hdtv-FlexGet'}
               - {title: 'Q Test.S01E02.1080p-FlexGet'}
 
           test_with_quality_1:
@@ -1779,13 +1786,6 @@ class TestDoubleEps(object):
               - title: double S01E03
             series:
               - double
-
-          test_double_prefered:
-            mock:
-              - title: double S02E03
-              - title: double S02E03-04
-            series:
-              - double
     """
 
     def test_double(self, execute_task):
@@ -1796,12 +1796,6 @@ class TestDoubleEps(object):
         # We already got ep 3 as part of double, should not be accepted
         task = execute_task('test_double2')
         assert not task.find_entry('accepted', title='double S01E03')
-
-    def test_double_prefered(self, execute_task):
-        # Given a choice of single or double ep at same quality, grab the double
-        task = execute_task('test_double_prefered')
-        assert task.find_entry('accepted', title='double S02E03-04')
-        assert not task.find_entry('accepted', title='S02E03')
 
 
 class TestAutoLockin(object):
@@ -2011,19 +2005,18 @@ class TestAlternateNames(object):
     # Test the DB behaves like we expect ie. alternate names cannot
     def test_alternate_names_are_removed_from_db(self, execute_task):
         from flexget.manager import Session
-        from flexget.plugins.filter.series import AlternateNames
         with Session() as session:
             execute_task('alternate_name')
             # test the current state of alternate names
-            assert len(session.query(AlternateNames).all()) == 1, 'There should be one alternate name present.'
-            assert session.query(AlternateNames).first().alt_name == 'Other Show', \
+            assert len(session.query(db.AlternateNames).all()) == 1, 'There should be one alternate name present.'
+            assert session.query(db.AlternateNames).first().alt_name == 'Other Show', \
                 'Alternate name should have been Other Show.'
 
             # run another task that overwrites the alternate names
             execute_task('another_alternate_name')
-            assert len(session.query(AlternateNames).all()) == 1, \
+            assert len(session.query(db.AlternateNames).all()) == 1, \
                 'The old alternate name should have been removed from the database.'
-            assert session.query(AlternateNames).first().alt_name == 'Good Show', \
+            assert session.query(db.AlternateNames).first().alt_name == 'Good Show', \
                 'The alternate name in the database should be the new one, Good Show.'
 
 

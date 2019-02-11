@@ -5,10 +5,10 @@ import time
 
 import pytest
 
+from flexget.components.trakt.db import TraktUserAuth
 from flexget.entry import Entry
 from flexget.manager import Session
-from flexget.plugins.internal.api_trakt import TraktUserAuth
-from flexget.plugins.list.trakt_list import TraktSet
+from flexget.components.trakt.trakt_list import TraktSet
 
 
 @pytest.mark.online
@@ -49,9 +49,9 @@ class TestTraktList(object):
     def db_auth(self, manager):
         kwargs = {
             'account': 'flexget_list_test',
-            'access_token': '7c2898cd175e28c9319f95a351873eaf7a970736cbb07ff015bf7ef652d7736a',
-            'refresh_token': '33918a6b4c3101892c79f6a13c0d15a050afe33491d7702d44bbce052923f745',
-            'created': 1526906378,
+            'access_token': 'c78844ac92c43cf81662d6a132d9412220023c5c962e1a80e519472e502e45c9',
+            'refresh_token': 'c33d487d3c27e33896a10f0edda08f14040ee27ee195f18442dd72555f9a9b9f',
+            'created': 1546067709,
             'expires': 7776000
         }
 
@@ -80,6 +80,7 @@ class TestTraktList(object):
                 'trakt_series_name': 'Castle',
                 'trakt_series_year': 2009,
                 'title': 'Castle (2009) S08E15 Fidelis Ad Mortem',
+                'original_title': 'Castle (2009) S08E15 Fidelis Ad Mortem',
                 'trakt_show_id': 1410,
                 'trakt_ep_name': 'Fidelis Ad Mortem',
                 'tvrage_id': 19267
@@ -89,6 +90,7 @@ class TestTraktList(object):
                 'original_url': 'https://trakt.tv/movies/deadpool-2016',
                 'tmdb_id': 293660,
                 'title': 'Deadpool (2016)',
+                'original_title': 'Deadpool (2016)',
                 'url': 'https://trakt.tv/movies/deadpool-2016',
                 'trakt_movie_id': 190430,
                 'trakt_movie_name': 'Deadpool',
@@ -101,6 +103,7 @@ class TestTraktList(object):
                 'trakt_show_slug': 'the-walking-dead',
                 'tmdb_id': 1402,
                 'title': 'The Walking Dead (2010)',
+                'original_title': 'The Walking Dead (2010)',
                 'url': 'https://trakt.tv/shows/the-walking-dead',
                 'original_url': 'https://trakt.tv/shows/the-walking-dead',
                 'series_name': 'The Walking Dead (2010)',
@@ -202,3 +205,8 @@ class TestTraktList(object):
         trakt_set.remove(entry)
         time.sleep(5)
         assert entry not in trakt_set
+
+    def test_trakt_pagination(self):
+        config = {'account': 'flexget_list_test', 'list': 'watched', 'type': 'movies'}
+        trakt_set = TraktSet(config)
+        assert len(trakt_set) == 25

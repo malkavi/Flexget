@@ -27,7 +27,8 @@ def cli_perf_test(manager, options):
 
 def imdb_query(session):
     import time
-    from flexget.plugins.metainfo.imdb_lookup import Movie
+    # NOTE: importing other plugins directly is discouraged
+    from flexget.components.imdb.utils_lookup import Movie
     from flexget.plugins.cli.performance import log_query_count
     from sqlalchemy.sql.expression import select
     from progressbar import ProgressBar, Percentage, Bar, ETA

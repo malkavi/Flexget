@@ -216,7 +216,10 @@ class Manager(object):
         if self.initialized:
             raise RuntimeError('Cannot call initialize on an already initialized manager.')
 
-        plugin.load_plugins(extra_dirs=[os.path.join(self.config_base, 'plugins')])
+        plugin.load_plugins(
+            extra_plugins=[os.path.join(self.config_base, 'plugins')],
+            extra_components=[os.path.join(self.config_base, 'components')],
+        )
 
         # Reparse CLI options now that plugins are loaded
         if not self.args:
@@ -336,7 +339,7 @@ class Manager(object):
             console('There is a FlexGet process already running for this config, sending execution there.')
             log.debug('Sending command to running FlexGet process: %s' % self.args)
             try:
-                client = IPCClient(ipc_info['port'], ipc_info['password'], sync_request_timeout=self.options.timeout)
+                client = IPCClient(ipc_info['port'], ipc_info['password'])
             except ValueError as e:
                 log.error(e)
             else:
