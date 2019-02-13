@@ -33,7 +33,7 @@ class UrlRewriteDescargas2020(object):
     # urlrewriter API
     def url_rewritable(self, task, entry):
         url = entry['url']
-        rewritable_regex = r'^http:\/\/(www.)?(descargas2020|tvsinpagar|tumejortorrent|torrentlocura|torrentrapid|pctnew).com\/.*'
+        rewritable_regex = r'^(http|https):\/\/(www.)?(descargas2020|tvsinpagar|tumejortorrent|torrentlocura|torrentrapid|pctnew).com\/.*'
         return re.match(rewritable_regex, url) and not url.endswith('.torrent')
 
     def session(self):
@@ -53,6 +53,9 @@ class UrlRewriteDescargas2020(object):
     @plugin.internet(log)
     def parse_download_page(self, url, task):
         log.verbose('Descargas2020 URL: %s', url)
+
+        if not self.requests:
+            self.requests = Session()
 
         txheaders = {'User-agent': 'Mozilla/4.0 (compatible; MSIE 5.5; Windows NT)'}
         page = requests.get(url, headers=txheaders)
