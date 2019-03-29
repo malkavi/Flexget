@@ -20,13 +20,15 @@ class Proxy(object):
             {'type': 'string', 'format': 'url'},
             {
                 'type': 'object',
-                'properties': dict((prot, {'type': 'string', 'format': 'url'}) for prot in PROTOCOLS),
-                'additionalProperties': False
-            }
+                'properties': dict(
+                    (prot, {'type': 'string', 'format': 'url'}) for prot in PROTOCOLS
+                ),
+                'additionalProperties': False,
+            },
         ]
     }
 
-    @plugin.priority(255)
+    @plugin.priority(plugin.PRIORITY_FIRST)
     def on_task_start(self, task, config):
         if not config:
             # If no configuration is provided, see if there are any proxy env variables

@@ -14,13 +14,16 @@ log = logging.getLogger('kitsu')
 
 
 class KitsuAnime(object):
-    """Creates an entry for each item in your kitsu.io list.
+    """
+    Creates an entry for each item in your kitsu.io list.
+
     Syntax:
+
     kitsu:
       username: <value>
       lists:
-      	- <current|planned|completed|on_hold|dropped>
-      	- <current|planned|completed|on_hold|dropped>
+        - <current|planned|completed|on_hold|dropped>
+        - <current|planned|completed|on_hold|dropped>
       status: <airing|finished>
       latest: <yes|no>
     """
@@ -29,9 +32,14 @@ class KitsuAnime(object):
         'type': 'object',
         'properties': {
             'username': {'type': 'string'},
-            'lists': one_or_more({'type': 'string', 'enum': ['current', 'planned', 'completed', 'on_hold', 'dropped']}),
+            'lists': one_or_more(
+                {
+                    'type': 'string',
+                    'enum': ['current', 'planned', 'completed', 'on_hold', 'dropped'],
+                }
+            ),
             'latest': {'type': 'boolean', 'default': False},
-            'status': {'type': 'string', 'enum': ['airing', 'finished']}
+            'status': {'type': 'string', 'enum': ['airing', 'finished']},
         },
         'required': ['username'],
         'additionalProperties': False,
@@ -42,7 +50,9 @@ class KitsuAnime(object):
         entries = []
         user_payload = {'filter[name]': config['username']}
         try:
-            user_response = task.requests.get('https://kitsu.io/api/edge/users', params=user_payload)
+            user_response = task.requests.get(
+                'https://kitsu.io/api/edge/users', params=user_payload
+            )
         except RequestException as e:
             error_message = 'Error finding User url: {url}'.format(url=e.request.url)
             if hasattr(e, 'response'):
@@ -51,10 +61,18 @@ class KitsuAnime(object):
             raise plugin.PluginError(error_message)
         user = user_response.json()
         if not len(user['data']):
-            raise plugin.PluginError('no such username found "{name}"'.format(name=config['username']))
-        next_url = 'https://kitsu.io/api/edge/users/{id}/library-entries'.format(id=user['data'][0]['id'])
-        payload = {'filter[status]': ','.join(config['lists']), 'filter[media_type]': 'Anime', 'include': 'media',
-                   'page[limit]': 20}
+            raise plugin.PluginError(
+                'no such username found "{name}"'.format(name=config['username'])
+            )
+        next_url = 'https://kitsu.io/api/edge/users/{id}/library-entries'.format(
+            id=user['data'][0]['id']
+        )
+        payload = {
+            'filter[status]': ','.join(config['lists']),
+            'filter[media_type]': 'Anime',
+            'include': 'media',
+            'page[limit]': 20,
+        }
         try:
             response = task.requests.get(next_url, params=payload)
         except RequestException as e:
@@ -72,7 +90,9 @@ class KitsuAnime(object):
                 if item['relationships']['media']['data']['id'] != anime['id']:
                     raise ValueError(
                         'Anime IDs {id1} and {id2} do not match'.format(
-                            id1=item['relationships']['media']['data']['id'], id2=anime['id']))
+                            id1=item['relationships']['media']['data']['id'], id2=anime['id']
+                        )
+                    )
                 status = config.get('status')
                 if status is not None:
                     if status == 'airing' and anime['attributes']['endDate'] is not None:
@@ -104,7 +124,9 @@ class KitsuAnime(object):
                 try:
                     response = task.requests.get(next_url)
                 except RequestException as e:
-                    error_message = 'Error getting list from next page url: {url}'.format(url=e.request.url)
+                    error_message = 'Error getting list from next page url: {url}'.format(
+                        url=e.request.url
+                    )
                     if hasattr(e, 'response'):
                         error_message += ' status: {status}'.format(status=e.response.status_code)
                     log.debug(error_message, exc_info=True)
