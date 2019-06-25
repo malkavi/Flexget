@@ -487,7 +487,7 @@ class Requirements(object):
         return True
 
     def __eq__(self, other):
-        if isinstance(other, str):
+        if isinstance(other, basestring):
             other = Requirements(other)
         return self.components == other.components
 

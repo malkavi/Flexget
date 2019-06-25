@@ -24,6 +24,9 @@ class KitsuAnime(object):
       lists:
         - <current|planned|completed|on_hold|dropped>
         - <current|planned|completed|on_hold|dropped>
+      type:
+        - <ona|ova|tv|movie|music|special>
+        - <ona|ova|tv|movie|music|special>
       status: <airing|finished>
       latest: <yes|no>
     """
@@ -38,6 +41,12 @@ class KitsuAnime(object):
                     'enum': ['current', 'planned', 'completed', 'on_hold', 'dropped'],
                 }
             ),
+            'type': one_or_more(
+                {
+                    'type': 'string',
+                    'enum': ['ona', 'ova', 'tv', 'movie', 'music', 'special'],
+                }
+            ),
             'latest': {'type': 'boolean', 'default': False},
             'status': {'type': 'string', 'enum': ['airing', 'finished']},
         },
@@ -47,7 +56,6 @@ class KitsuAnime(object):
 
     @cached('kitsu', persist='2 hours')
     def on_task_input(self, task, config):
-        entries = []
         user_payload = {'filter[name]': config['username']}
         try:
             user_response = task.requests.get(
@@ -100,6 +108,12 @@ class KitsuAnime(object):
                     if status == 'finished' and anime['attributes']['endDate'] is None:
                         continue
 
+                types = config.get('type')
+                if types is not None:
+                    subType = anime['attributes']['subtype']
+                    if subType is None or not subType.lower() in types:
+                        continue
+                    
                 entry = Entry()
                 entry['title'] = anime['attributes']['canonicalTitle']
                 titles_en = anime['attributes']['titles'].get('en')
@@ -117,7 +131,7 @@ class KitsuAnime(object):
                         entry['series_episode'] = item['progress']
                         entry['series_id_type'] = 'sequence'
                         entry['title'] += ' ' + str(entry['progress'])
-                    entries.append(entry)
+                    yield entry
 
             next_url = json_data['links'].get('next')
             if next_url:
@@ -134,8 +148,6 @@ class KitsuAnime(object):
                 json_data = response.json()
             else:
                 break
-
-        return entries
 
 
 @event('plugin.register')
