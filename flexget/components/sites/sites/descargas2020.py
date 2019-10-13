@@ -21,7 +21,7 @@ log = logging.getLogger('descargas2020')
 DESCARGAS2020_TORRENT_FORMAT = 'http://descargas2020.com/download/{:0>6}.torrent'
 PCTNEW_TORRENT_FORMAT = 'http://pctnew.com/download/{:0>6}.torrent'
 REWRITABLE_REGEX = re.compile(
-    r'https?://(www.)?(descargas2020|tvsinpagar|tumejortorrent|torrentlocura|torrentrapid|pctnew).com/'
+    r'https?://(www.)?(descargas2020|tvsinpagar|tumejortorrent|torrentlocura|torrentrapid|pctnew).(com|org)/'
 )
 NONREWRITABLE_REGEX = re.compile(
     r'(.*/descargar-torrent/|.*\.torrent$)'
@@ -43,7 +43,7 @@ class UrlRewriteDescargas2020(object):
             self._session.headers.update(
                 {'User-Agent': 'Mozilla/4.0 (compatible; MSIE 5.5; Windows NT)'}
             )
-            self._session.add_domain_limiter(TimedLimiter('descargas2020.com', '2 seconds'))
+            self._session.add_domain_limiter(TimedLimiter('descargas2020.org', '2 seconds'))
         return self._session
 
     # urlrewriter API
@@ -101,7 +101,7 @@ class UrlRewriteDescargas2020(object):
             log.debug('Descargas2020 disabled')
             return set()
         log.debug('Search Descargas2020')
-        url_search = 'http://descargas2020.com/buscar'
+        url_search = 'https://descargas2020.org/buscar'
         results = set()
         for search_string in entry.get('search_strings', [entry['title']]):
             query = normalize_unicode(search_string)
