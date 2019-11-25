@@ -1,19 +1,19 @@
-from __future__ import unicode_literals, division, absolute_import
-
 import datetime
 import logging
 
-from requests.exceptions import TooManyRedirects
-from sqlalchemy import Column, Unicode, DateTime
 from dateutil.parser import parse as dateutil_parse
+from requests.exceptions import TooManyRedirects
+from sqlalchemy import Column, DateTime, Unicode
 
-from flexget import plugin, db_schema
+from flexget import db_schema, plugin
 from flexget.config_schema import one_or_more
 from flexget.entry import Entry
 from flexget.event import event
 from flexget.manager import Session
 from flexget.utils.database import json_synonym
-from flexget.utils.requests import Session as RequestSession, TimedLimiter, RequestException
+from flexget.utils.requests import RequestException
+from flexget.utils.requests import Session as RequestSession
+from flexget.utils.requests import TimedLimiter
 from flexget.utils.tools import parse_filesize
 
 log = logging.getLogger('passthepopcorn')
@@ -101,7 +101,7 @@ class PassThePopcornCookie(Base):
     expires = Column(DateTime)
 
 
-class SearchPassThePopcorn(object):
+class SearchPassThePopcorn:
     """
         PassThePopcorn search plugin.
     """
@@ -117,6 +117,7 @@ class SearchPassThePopcorn(object):
             'order_desc': {'type': 'boolean', 'default': True},
             'freeleech': {'type': 'boolean'},
             'release_type': {'type': 'string', 'enum': list(RELEASE_TYPES.keys())},
+            'grouping': {'type': 'boolean', 'default': True},
         },
         'required': ['username', 'password', 'passkey'],
         'additionalProperties': False,
@@ -246,6 +247,8 @@ class SearchPassThePopcorn(object):
 
         ordering = 'desc' if config['order_desc'] else 'asc'
 
+        grouping = int(config['grouping'])
+
         entries = set()
 
         params.update(
@@ -254,6 +257,7 @@ class SearchPassThePopcorn(object):
                 'order_way': ordering,
                 'action': 'advanced',
                 'json': 'noredirect',
+                'grouping': grouping,
             }
         )
 

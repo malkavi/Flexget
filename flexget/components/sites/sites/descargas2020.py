@@ -1,20 +1,15 @@
-from __future__ import unicode_literals, division, absolute_import
-from builtins import *  # noqa pylint: disable=unused-import, redefined-builtin
-
 import logging
 import re
+import unicodedata
 
 from flexget import plugin
-from flexget.event import event
 from flexget.components.sites.urlrewriting import UrlRewritingError
+from flexget.components.sites.utils import normalize_unicode
+from flexget.entry import Entry
+from flexget.event import event
+from flexget.utils import requests
 from flexget.utils.requests import Session, TimedLimiter
 from flexget.utils.soup import get_soup
-from flexget.utils import requests
-
-from flexget.entry import Entry
-from flexget.components.sites.utils import normalize_unicode
-
-import unicodedata
 
 log = logging.getLogger('descargas2020')
 
@@ -23,11 +18,10 @@ PCTNEW_TORRENT_FORMAT = 'http://pctnew.com/download/{:0>6}.torrent'
 REWRITABLE_REGEX = re.compile(
     r'https?://(www.)?(descargas2020|tvsinpagar|tumejortorrent|torrentlocura|torrentrapid|pctnew).(com|org)/'
 )
-NONREWRITABLE_REGEX = re.compile(
-    r'(.*/descargar-torrent/|.*\.torrent$)'
-)
+NONREWRITABLE_REGEX = re.compile(r'(.*/descargar-torrent/|.*\.torrent$)')
 
-class UrlRewriteDescargas2020(object):
+
+class UrlRewriteDescargas2020:
     """Descargas2020 urlrewriter and search."""
 
     schema = {'type': 'boolean', 'default': False}

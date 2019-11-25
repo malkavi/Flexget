@@ -1,6 +1,3 @@
-from __future__ import unicode_literals, division, absolute_import
-from builtins import *  # noqa pylint: disable=unused-import, redefined-builtin
-
 import logging
 import re
 
@@ -14,7 +11,7 @@ from flexget.utils.soup import get_soup
 log = logging.getLogger('horriblesubs')
 
 
-class HorribleSubs(object):
+class HorribleSubs:
     """
     Give latest horriblesubs releases
     """
@@ -83,25 +80,12 @@ class HorribleSubs(object):
             )
         return entries
 
-    @staticmethod
-    def scraper():
-        try:
-            import cfscrape
-        except ImportError as e:
-            log.debug('Error importing cfscrape: %s', e)
-            raise plugin.DependencyError(
-                'cfscraper', 'cfscrape', 'cfscrape module required. ImportError: %s' % e
-            )
-        else:
-            return cfscrape.create_scraper()
-
     @cached('horriblesubs')
     def on_task_input(self, task, config):
         if not config:
             return
-        scraper = HorribleSubs.scraper()
         return HorribleSubs.horrible_entries(
-            scraper, 'https://horriblesubs.info/api.php?method=getlatest'
+            task.requests, 'https://horriblesubs.info/api.php?method=getlatest'
         )
 
     # Search API method
@@ -109,11 +93,10 @@ class HorribleSubs(object):
         if not config:
             return
         entries = []
-        scraper = HorribleSubs.scraper()
         for search_string in entry.get('search_strings', [entry['title']]):
             log.debug('Searching `%s`', search_string)
             results = HorribleSubs.horrible_entries(
-                scraper,
+                task.requests,
                 'https://horriblesubs.info/api.php?method=search&value={0}'.format(search_string),
             )
             entries.extend(results)

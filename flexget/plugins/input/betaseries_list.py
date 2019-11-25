@@ -1,9 +1,6 @@
 """Input plugin for www.betaseries.com"""
-from __future__ import unicode_literals, division, absolute_import
-from builtins import *  # noqa pylint: disable=unused-import, redefined-builtin
-
-from hashlib import md5
 import logging
+from hashlib import md5
 
 from flexget import plugin
 from flexget.entry import Entry
@@ -16,7 +13,7 @@ log = logging.getLogger('betaseries_list')
 API_URL_PREFIX = 'https://api.betaseries.com/'
 
 
-class BetaSeriesList(object):
+class BetaSeriesList:
     """
     Emits an entry for each serie followed by one or more BetaSeries account.
     See https://www.betaseries.com/
@@ -175,7 +172,7 @@ def query_series(api_key, user_token, member_name=None):
             log.error("member %r not found" % member_name)
             return []
     r = requests.get(
-        API_URL_PREFIX + 'members/infos',
+        API_URL_PREFIX + 'shows/member',
         params=params,
         headers={
             'Accept': 'application/json',
@@ -190,7 +187,7 @@ def query_series(api_key, user_token, member_name=None):
     for err in error_list:
         log.error(str(err))
     if not error_list:
-        return [x['title'] for x in j['member']['shows'] if x['user']['archived'] is False]
+        return [x['title'] for x in j['shows'] if x['user']['archived'] is False]
     else:
         return []
 
