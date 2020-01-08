@@ -14,10 +14,9 @@ from flexget.utils.soup import get_soup
 
 logger = logger.bind(name='descargas2020')
 
-DESCARGAS2020_TORRENT_FORMAT = 'http://descargas2020.com/download/{:0>6}.torrent'
-PCTNEW_TORRENT_FORMAT = 'http://pctnew.com/download/{:0>6}.torrent'
+DESCARGAS2020_TORRENT_FORMAT = 'https://descargas2020.org/download/{:0>6}.torrent'
 REWRITABLE_REGEX = re.compile(
-    r'https?://(www.)?(descargas2020|tvsinpagar|tumejortorrent|torrentlocura|torrentrapid|pctnew).(com|org)/'
+    r'https?://(www.)?(descargas2020|tvsinpagar|tumejortorrent|torrentlocura|torrentrapid).(org|com)/'
 )
 NONREWRITABLE_REGEX = re.compile(r'(.*/descargar-torrent/|.*\.torrent$)')
 
@@ -65,8 +64,6 @@ class UrlRewriteDescargas2020:
 
         torrent_id = None
         url_format = DESCARGAS2020_TORRENT_FORMAT
-        if 'pctnew.com' in url:
-            url_format = PCTNEW_TORRENT_FORMAT
 
         torrent_id_prog = re.compile(
             r"(?:parametros\s*=\s*\n?)\s*{\s*\n(?:\s*'\w+'\s*:.*\n)+\s*'(?:torrentID|id)'\s*:\s*'(\d+)'"
@@ -110,7 +107,7 @@ class UrlRewriteDescargas2020:
                 logger.error('Error searching Descargas2020: {}', e)
                 return results
             content = response.content
-            soup = get_soup(content, "html.parser")
+            soup = get_soup(content)
             soup2 = soup.find('ul', attrs={'class': 'buscar-list'})
             children = soup2.findAll('a', href=True)
             for child in children:
