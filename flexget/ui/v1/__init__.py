@@ -22,6 +22,8 @@ webui_app = Flask(__name__)
 Compress(webui_app)
 webui_app.url_path = '/v1/'
 
+HTTP_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
+
 
 @webui_app.route('/<path:path>')
 def serve_app(path):
@@ -41,9 +43,9 @@ def serve_app(path):
 
 
 @webui_app.route('/api/')
-@webui_app.route('/api/<path:path>')
+@webui_app.route('/api/<path:path>', methods=HTTP_METHODS)
 def api_redirect(path='/'):
-    return redirect(request.full_path.replace('/v1', '', 1), 302)
+    return redirect(request.full_path.replace('/v1', '', 1), 307)
 
 
 @webui_app.route('/')
@@ -89,5 +91,5 @@ def register_web_ui(mgr):
             )
             app_base = None
 
-    register_app(webui_app.url_path, webui_app)
+    register_app(webui_app.url_path, webui_app, 'WebUI (v1)')
     register_home('%s/' % webui_app.url_path)

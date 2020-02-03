@@ -7,15 +7,16 @@ from sqlalchemy import Column, DateTime, Integer, Unicode, select
 from flexget import db_schema, plugin
 from flexget.config_schema import one_or_more
 from flexget.db_schema import versioned_base
+from flexget.entry import Entry
 from flexget.event import event
 from flexget.manager import Session
-from flexget.utils import json
+from flexget.utils import json, serialization
 from flexget.utils.database import entry_synonym
 from flexget.utils.sqlalchemy_utils import table_add_column, table_schema
 from flexget.utils.tools import parse_timedelta
 
 logger = logger.bind(name='digest')
-Base = versioned_base('digest', 1)
+Base = versioned_base('digest', 2)
 
 
 @db_schema.upgrade('digest')
@@ -39,6 +40,20 @@ def upgrade(ver, session):
                 logger.error('Unable error upgrading backlog pickle object due to {}', str(e))
 
         ver = 1
+    if ver == 1:
+        table = table_schema('digest_entries', session)
+        for row in session.execute(select([table.c.id, table.c.json])):
+            if not row['json']:
+                # Seems there could be invalid data somehow. See #2590
+                continue
+            data = json.loads(row['json'], decode_datetime=True)
+            # If title looked like a date, make sure it's a string
+            title = str(data.pop('title'))
+            e = Entry(title=title, **data)
+            session.execute(
+                table.update().where(table.c.id == row['id']).values(json=serialization.dumps(e))
+            )
+        ver = 2
     return ver
 
 

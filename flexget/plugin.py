@@ -14,7 +14,7 @@ from requests import RequestException
 from flexget import components as components_pkg
 from flexget import config_schema
 from flexget import plugins as plugins_pkg
-from flexget.event import add_event_handler as add_phase_handler
+from flexget.event import add_event_handler as add_phase_handler, event
 from flexget.event import fire_event, remove_event_handlers
 
 logger = logger.bind(name='plugin')
@@ -287,6 +287,8 @@ class PluginInfo(dict):
         self.debug = debug
         self.category = category
         self.phase_handlers = {}
+        self.schema = {}
+        self.schema_id = None
 
         self.plugin_class = plugin_class
         self.instance = None
@@ -319,9 +321,8 @@ class PluginInfo(dict):
             self.schema = {}
 
         if self.schema is not None:
-            location = '/schema/plugin/%s' % self.name
-            self.schema['id'] = location
-            config_schema.register_schema(location, self.schema)
+            self.schema_id = f'/schema/plugin/{self.name}'
+            config_schema.register_schema(self.schema_id, self.schema)
 
         self.build_phase_handlers()
 
@@ -603,14 +604,16 @@ def plugin_schemas(**kwargs):
     """Create a dict schema that matches plugins specified by `kwargs`"""
     return {
         'type': 'object',
-        'properties': dict((p.name, {'$ref': p.schema['id']}) for p in get_plugins(**kwargs)),
+        'properties': {p.name: {'$ref': p.schema_id} for p in get_plugins(**kwargs)},
         'additionalProperties': False,
         'error_additionalProperties': '{{message}} Only known plugin names are valid keys.',
         'patternProperties': {'^_': {'title': 'Disabled Plugin'}},
     }
 
 
-config_schema.register_schema('/schema/plugins', plugin_schemas)
+@event('config.register')
+def register_schema():
+    config_schema.register_schema('/schema/plugins', plugin_schemas)
 
 
 def get_phases_by_plugin(name):
