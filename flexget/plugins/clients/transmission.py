@@ -220,10 +220,12 @@ class PluginTransmissionInput(TransmissionBase):
                 'date_added',
                 'date_done',
                 'date_started',
+                'errorString',
                 'priority',
                 'progress',
                 'secondsDownloading',
                 'secondsSeeding',
+                'torrentFile',
             ]:
                 try:
                     entry['transmission_' + attr] = getattr(torrent, attr)
